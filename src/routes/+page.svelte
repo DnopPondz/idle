@@ -44,7 +44,7 @@
         />
         <button
           type="submit"
-          class="rounded-xl bg-teal-500 px-5 py-3 text-sm font-semibold tracking-wide text-slate-900 transition hover:bg-teal-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-300 focus-visible:ring-offset-slate-950"
+          class="rounded-xl bg-teal-500 px-5 py-3 text-sm font-semibold tracking-wide text-slate-900 transition hover:bg-teal-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-300 focus-visible:ring-offset-slate-900"
         >
           ส่งคำสั่ง
         </button>
