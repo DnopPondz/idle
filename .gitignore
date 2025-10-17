@@ -1,0 +1,101 @@
+# --- OS / Editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# --- Node / Package managers ---
+node_modules/
+.pnpm-store/
+.npm/
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+
+# Lockfiles (do NOT ignore; keep them for reproducible builds)
+# bun.lockb
+# pnpm-lock.yaml
+# package-lock.json
+# yarn.lock
+
+# --- TypeScript / Build outputs ---
+dist/
+build/
+lib/
+tsbuildinfo.tsbuildinfo
+*.tsbuildinfo
+
+# --- Next.js / React ---
+.next/
+.next/cache/
+out/
+.swp
+*.log
+
+# Turborepo / Turbopack
+.turbo/
+.turborepo/
+.turbopack/
+
+# SWC / Babel / Cache
+.swc/
+.cache/
+.babel-cache/
+.parcel-cache/
+
+# --- Testing / Coverage ---
+coverage/
+.nyc_output/
+
+# Cypress / Playwright
+cypress/videos/
+cypress/screenshots/
+playwright-report/
+blob-report/
+test-results/
+
+# --- Env & secrets ---
+.env
+.env.*
+!.env.example
+*.local
+
+# --- Logs & diagnostics ---
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+bun-debug.log*
+
+# --- Images & uploads (keep if generated at runtime) ---
+uploads/
+tmp/
+temp/
+
+# --- Database / ORM ---
+*.sqlite
+*.sqlite-journal
+# Prisma
+prisma/dev.db
+prisma/dev.db-journal
+
+# --- Serverless / Deployment ---
+.vercel/
+.netlify/
+.functions/
+
+# --- Misc ---
+*.pem
+*.key
+*.crt
+*.pid
+*.seed
+*.tgz
+*.orig
+*.rej
