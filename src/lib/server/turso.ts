@@ -73,6 +73,46 @@ const getCredentials = () => {
   return { url: toHttpsUrl(url), authToken };
 };
 
+type TursoValue =
+  | { type: 'null' }
+  | { type: 'text'; value: string }
+  | { type: 'integer'; value: number }
+  | { type: 'float'; value: number }
+  | { type: 'blob'; base64: string };
+
+const toValue = (input: unknown): TursoValue => {
+  if (input === null || input === undefined) {
+    return { type: 'null' };
+  }
+
+  if (typeof input === 'number') {
+    if (Number.isFinite(input)) {
+      return Number.isInteger(input)
+        ? { type: 'integer', value: input }
+        : { type: 'float', value: input };
+    }
+    return { type: 'text', value: String(input) };
+  }
+
+  if (typeof input === 'boolean') {
+    return { type: 'integer', value: input ? 1 : 0 };
+  }
+
+  if (input instanceof Date) {
+    return { type: 'text', value: input.toISOString() };
+  }
+
+  if (typeof input === 'object') {
+    try {
+      return { type: 'text', value: JSON.stringify(input) };
+    } catch {
+      return { type: 'text', value: String(input) };
+    }
+  }
+
+  return { type: 'text', value: String(input) };
+};
+
 const request = async (sql: string, args: unknown[] = []) => {
   const { url, authToken } = getCredentials();
 
@@ -88,7 +128,7 @@ const request = async (sql: string, args: unknown[] = []) => {
           type: 'execute',
           stmt: {
             sql,
-            args,
+            args: args.map(toValue),
           },
         },
       ],
