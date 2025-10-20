@@ -10,20 +10,24 @@ interface TursoExecuteResult {
   columns?: TursoColumn[];
   rows?: unknown[][];
   rowsAffected?: number | string;
+  rows_affected?: number | string;
   affectedRowCount?: number | string;
   lastInsertRowid?: number | string | null;
+  last_insert_rowid?: number | string | null;
 }
 
 interface TursoPipelineExecuteResult {
   type: 'execute';
   result?: TursoExecuteResult;
-  error?: { message?: string };
+  response?: TursoExecuteResult;
+  error?: { message?: string } | null;
 }
 
 interface TursoPipelineErrorResult {
   type: string;
   error: { message?: string };
   result?: TursoExecuteResult;
+  response?: TursoExecuteResult;
 }
 
 interface TursoPipelineResponse {
@@ -109,11 +113,14 @@ const request = async (sql: string, args: unknown[] = []) => {
     throw new TursoRequestError(firstResult.error.message ?? 'Unknown Turso error.');
   }
 
-  if (!('result' in firstResult) || !firstResult.result) {
+  const payloadResult = 'result' in firstResult ? firstResult.result : undefined;
+  const payloadResponse = 'response' in firstResult ? firstResult.response : undefined;
+
+  if (!payloadResult && !payloadResponse) {
     throw new TursoRequestError('Turso response did not include a result payload.');
   }
 
-  return firstResult.result;
+  return payloadResult ?? payloadResponse ?? {};
 };
 
 const mapRows = (result: TursoExecuteResult) => {
@@ -134,16 +141,24 @@ export const execute = async (sql: string, args: unknown[] = []) => {
   const result = await request(sql, args);
   return {
     rows: mapRows(result),
-    rowsAffected: Number(result.rowsAffected ?? result.affectedRowCount ?? 0),
-    lastInsertRowid: result.lastInsertRowid ? Number(result.lastInsertRowid) : undefined,
+    rowsAffected: Number(result.rowsAffected ?? result.rows_affected ?? result.affectedRowCount ?? 0),
+    lastInsertRowid: result.lastInsertRowid
+      ? Number(result.lastInsertRowid)
+      : result.last_insert_rowid
+        ? Number(result.last_insert_rowid)
+        : undefined,
   };
 };
 
 export const executeWithoutRows = async (sql: string, args: unknown[] = []) => {
   const result = await request(sql, args);
   return {
-    rowsAffected: Number(result.rowsAffected ?? result.affectedRowCount ?? 0),
-    lastInsertRowid: result.lastInsertRowid ? Number(result.lastInsertRowid) : undefined,
+    rowsAffected: Number(result.rowsAffected ?? result.rows_affected ?? result.affectedRowCount ?? 0),
+    lastInsertRowid: result.lastInsertRowid
+      ? Number(result.lastInsertRowid)
+      : result.last_insert_rowid
+        ? Number(result.last_insert_rowid)
+        : undefined,
   };
 };
 
