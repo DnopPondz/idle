@@ -1,15 +1,62 @@
 <script lang="ts">
-  let command = '';
-  let history: string[] = [];
+  import type { PageData } from './$types';
+  import type { CommandRecord } from '$lib/server/commands';
+
+  export let data: PageData;
 
   const placeholderCommands = ['npm install', 'npm run dev', 'npm run build'];
 
-  const handleSubmit = () => {
-    const trimmed = command.trim();
-    if (!trimmed) return;
+  let command = '';
+  let history: CommandRecord[] = data.history ?? [];
+  let errorMessage: string | null = data.error ?? null;
+  let isSubmitting = false;
 
-    history = [...history, trimmed];
-    command = '';
+  const handleSubmit = async () => {
+    const trimmed = command.trim();
+    if (!trimmed || isSubmitting) return;
+
+    isSubmitting = true;
+    errorMessage = null;
+
+    try {
+      const response = await fetch('/api/commands', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ command: trimmed }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        errorMessage = payload.error ?? 'ไม่สามารถบันทึกคำสั่งได้ กรุณาลองใหม่อีกครั้ง';
+        return;
+      }
+
+      const created = payload.command as CommandRecord | undefined;
+      if (created) {
+        history = [created, ...history];
+        command = '';
+      }
+    } catch (error) {
+      console.error(error);
+      errorMessage = 'เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล Turso';
+    } finally {
+      isSubmitting = false;
+    }
+  };
+
+  const formatTimestamp = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.valueOf())) {
+      return value;
+    }
+
+    return new Intl.DateTimeFormat('th-TH', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(date);
   };
 </script>
 
@@ -36,22 +83,27 @@
       <div class="flex flex-col gap-3 sm:flex-row">
         <input
           id="command-input"
-          class="flex-1 rounded-xl border border-slate-800/70 bg-slate-900/80 px-4 py-3 font-mono text-sm text-teal-200 placeholder:text-slate-500 focus:border-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+          class="flex-1 rounded-xl border border-slate-800/70 bg-slate-900/80 px-4 py-3 font-mono text-sm text-teal-200 placeholder:text-slate-500 focus:border-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40 disabled:cursor-not-allowed disabled:opacity-60"
           type="text"
           bind:value={command}
           placeholder={placeholderCommands[history.length % placeholderCommands.length]}
           autocomplete="off"
+          disabled={isSubmitting}
         />
         <button
           type="submit"
-          class="rounded-xl bg-teal-500 px-5 py-3 text-sm font-semibold tracking-wide text-slate-950 transition hover:bg-teal-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-300 focus-visible:ring-offset-slate-950"
+          class="rounded-xl bg-teal-500 px-5 py-3 text-sm font-semibold tracking-wide text-slate-950 transition hover:bg-teal-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-300 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={isSubmitting}
         >
-          ส่งคำสั่ง
+          {isSubmitting ? 'กำลังส่ง...' : 'ส่งคำสั่ง'}
         </button>
       </div>
       <p class="text-xs text-slate-400">
         Tip: กด Enter เพื่อยืนยันคำสั่ง หรือคลิกปุ่ม “ส่งคำสั่ง”
       </p>
+      {#if errorMessage}
+        <p class="text-sm text-rose-400">{errorMessage}</p>
+      {/if}
     </form>
 
     <section class="glass-panel rounded-2xl border border-white/10 shadow-xl shadow-black/30">
@@ -65,12 +117,18 @@
         </p>
       {:else}
         <div class="divide-y divide-white/10">
-          {#each history as entry, index (index)}
-            <pre class="overflow-x-auto px-6 py-4 text-sm text-teal-200">
-              <code class="block font-mono text-left">
-                $ {entry}
-              </code>
-            </pre>
+          {#each history as entry (entry.id)}
+            <article class="px-6 py-4 space-y-2">
+              <header class="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-slate-500">
+                <span>คำสั่งที่บันทึก</span>
+                <span>{formatTimestamp(entry.created_at)}</span>
+              </header>
+              <pre class="overflow-x-auto rounded-xl bg-slate-900/60 px-4 py-3 text-sm text-teal-200">
+                <code class="block font-mono text-left">
+                  $ {entry.content}
+                </code>
+              </pre>
+            </article>
           {/each}
         </div>
       {/if}
