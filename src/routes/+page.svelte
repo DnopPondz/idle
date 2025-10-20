@@ -1,137 +1,324 @@
 <script lang="ts">
-  import type { PageData } from './$types';
-  import type { CommandRecord } from '$lib/server/commands';
+  type Tab = 'login' | 'register';
 
-  export let data: PageData;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  const placeholderCommands = ['npm install', 'npm run dev', 'npm run build'];
+  let activeTab: Tab = 'login';
 
-  let command = '';
-  let history: CommandRecord[] = data.history ?? [];
-  let errorMessage: string | null = data.error ?? null;
-  let isSubmitting = false;
+  let registerForm = {
+    username: '',
+    email: '',
+    playerName: '',
+    password: '',
+    confirmPassword: '',
+  };
 
-  const handleSubmit = async () => {
-    const trimmed = command.trim();
-    if (!trimmed || isSubmitting) return;
+  let loginForm = {
+    username: '',
+    password: '',
+  };
 
-    isSubmitting = true;
-    errorMessage = null;
+  let registerError: string | null = null;
+  let registerSuccess: string | null = null;
+  let verificationLink: string | null = null;
+  let loginError: string | null = null;
+  let loginSuccess: string | null = null;
+
+  let isSubmittingRegister = false;
+  let isSubmittingLogin = false;
+
+  const tabButtonClasses =
+    'rounded-full px-4 py-2 text-slate-300 transition hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-300/60 focus-visible:ring-offset-slate-950';
+  const activeTabClass = 'bg-teal-500/20 text-teal-200';
+
+  const resetMessages = () => {
+    registerError = null;
+    registerSuccess = null;
+    verificationLink = null;
+    loginError = null;
+    loginSuccess = null;
+  };
+
+  const switchTab = (tab: Tab) => {
+    if (activeTab === tab) return;
+    activeTab = tab;
+    resetMessages();
+  };
+
+  const submitRegister = async () => {
+    if (isSubmittingRegister) return;
+
+    resetMessages();
+
+    if (!registerForm.username.trim()) {
+      registerError = 'กรุณาระบุชื่อผู้ใช้';
+      return;
+    }
+
+    if (!emailRegex.test(registerForm.email.trim())) {
+      registerError = 'รูปแบบอีเมลไม่ถูกต้อง';
+      return;
+    }
+
+    if (!registerForm.playerName.trim()) {
+      registerError = 'กรุณาระบุชื่อผู้เล่น';
+      return;
+    }
+
+    if (registerForm.password.length < 8) {
+      registerError = 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร';
+      return;
+    }
+
+    if (registerForm.password !== registerForm.confirmPassword) {
+      registerError = 'รหัสผ่านและการยืนยันไม่ตรงกัน';
+      return;
+    }
+
+    isSubmittingRegister = true;
 
     try {
-      const response = await fetch('/api/commands', {
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ command: trimmed }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(registerForm),
       });
 
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        errorMessage = payload.error ?? 'ไม่สามารถบันทึกคำสั่งได้ กรุณาลองใหม่อีกครั้ง';
+        registerError = typeof payload.error === 'string' ? payload.error : 'ไม่สามารถสร้างบัญชีได้';
         return;
       }
 
-      const created = payload.command as CommandRecord | undefined;
-      if (created) {
-        history = [created, ...history];
-        command = '';
-      }
+      registerSuccess = typeof payload.message === 'string'
+        ? payload.message
+        : 'สร้างบัญชีสำเร็จ กรุณาตรวจสอบอีเมลของคุณ';
+      verificationLink = typeof payload.verificationLink === 'string' ? payload.verificationLink : null;
+
+      registerForm = {
+        username: '',
+        email: '',
+        playerName: '',
+        password: '',
+        confirmPassword: '',
+      };
     } catch (error) {
       console.error(error);
-      errorMessage = 'เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล Turso';
+      registerError = 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์';
     } finally {
-      isSubmitting = false;
+      isSubmittingRegister = false;
     }
   };
 
-  const formatTimestamp = (value: string) => {
-    const date = new Date(value);
-    if (Number.isNaN(date.valueOf())) {
-      return value;
+  const submitLogin = async () => {
+    if (isSubmittingLogin) return;
+
+    resetMessages();
+
+    if (!loginForm.username.trim()) {
+      loginError = 'กรุณาระบุชื่อผู้ใช้';
+      return;
     }
 
-    return new Intl.DateTimeFormat('th-TH', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(date);
+    if (!loginForm.password) {
+      loginError = 'กรุณาระบุรหัสผ่าน';
+      return;
+    }
+
+    isSubmittingLogin = true;
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(loginForm),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        loginError = typeof payload.error === 'string' ? payload.error : 'ไม่สามารถเข้าสู่ระบบได้';
+        return;
+      }
+
+      loginSuccess = typeof payload.message === 'string'
+        ? payload.message
+        : 'เข้าสู่ระบบสำเร็จ';
+
+      loginForm = {
+        username: '',
+        password: '',
+      };
+    } catch (error) {
+      console.error(error);
+      loginError = 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์';
+    } finally {
+      isSubmittingLogin = false;
+    }
   };
 </script>
 
 <div class="page-shell min-h-screen flex flex-col items-center px-6 py-16">
-  <div class="w-full max-w-3xl space-y-10">
+  <div class="w-full max-w-4xl space-y-10">
     <header class="text-center space-y-3">
       <p class="text-sm uppercase tracking-[0.4em] text-teal-300/80 font-semibold">Idle MMO Toolkit</p>
-      <h1 class="text-4xl font-bold sm:text-5xl">
-        Tailwind CSS พร้อมใช้งานแล้ว
-      </h1>
+      <h1 class="text-4xl font-bold sm:text-5xl">เตรียมตัวผจญภัยในโลก Idle MMO</h1>
       <p class="text-base text-slate-300">
-        เริ่มต้นพิมพ์คำสั่งเพื่อดูผลลัพธ์ที่จัดรูปแบบด้วย <code class="font-mono text-teal-300">&lt;pre&gt;</code>
-        และ <code class="font-mono text-teal-300">&lt;code&gt;</code> ด้านล่าง
+        สร้างบัญชีผู้เล่นและยืนยันอีเมลของคุณเพื่อเข้าสู่ระบบ แล้วเริ่มสะสมพลังไปพร้อมกัน
       </p>
     </header>
 
-    <form
-      class="glass-panel rounded-2xl p-6 shadow-xl shadow-black/30 border border-white/10 space-y-4"
-      on:submit|preventDefault={handleSubmit}
-    >
-      <label class="block text-sm font-medium text-slate-200" for="command-input">
-        พิมพ์คำสั่งของคุณ
-      </label>
-      <div class="flex flex-col gap-3 sm:flex-row">
-        <input
-          id="command-input"
-          class="flex-1 rounded-xl border border-slate-800/70 bg-slate-900/80 px-4 py-3 font-mono text-sm text-teal-200 placeholder:text-slate-500 focus:border-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40 disabled:cursor-not-allowed disabled:opacity-60"
-          type="text"
-          bind:value={command}
-          placeholder={placeholderCommands[history.length % placeholderCommands.length]}
-          autocomplete="off"
-          disabled={isSubmitting}
-        />
+    <div class="glass-panel rounded-2xl border border-white/10 shadow-xl shadow-black/30">
+      <nav class="flex items-center justify-center gap-4 border-b border-white/10 bg-white/5 px-6 py-4 text-sm font-semibold">
         <button
-          type="submit"
-          class="rounded-xl bg-teal-500 px-5 py-3 text-sm font-semibold tracking-wide text-slate-950 transition hover:bg-teal-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-300 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isSubmitting}
+          type="button"
+          class={`${tabButtonClasses} ${activeTab === 'login' ? activeTabClass : ''}`}
+          on:click={() => switchTab('login')}
         >
-          {isSubmitting ? 'กำลังส่ง...' : 'ส่งคำสั่ง'}
+          เข้าสู่ระบบ
         </button>
-      </div>
-      <p class="text-xs text-slate-400">
-        Tip: กด Enter เพื่อยืนยันคำสั่ง หรือคลิกปุ่ม “ส่งคำสั่ง”
-      </p>
-      {#if errorMessage}
-        <p class="text-sm text-rose-400">{errorMessage}</p>
-      {/if}
-    </form>
+        <button
+          type="button"
+          class={`${tabButtonClasses} ${activeTab === 'register' ? activeTabClass : ''}`}
+          on:click={() => switchTab('register')}
+        >
+          ลงทะเบียน
+        </button>
+      </nav>
 
-    <section class="glass-panel rounded-2xl border border-white/10 shadow-xl shadow-black/30">
-      <header class="border-b border-white/10 bg-white/5 px-6 py-4">
-        <h2 class="text-lg font-semibold text-teal-300">ผลลัพธ์คำสั่ง</h2>
-      </header>
-
-      {#if history.length === 0}
-        <p class="px-6 py-6 text-sm text-slate-400">
-          ยังไม่มีคำสั่ง — เริ่มต้นทดลองได้เลยด้านบน!
-        </p>
-      {:else}
-        <div class="divide-y divide-white/10">
-          {#each history as entry (entry.id)}
-            <article class="px-6 py-4 space-y-2">
-              <header class="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-slate-500">
-                <span>คำสั่งที่บันทึก</span>
-                <span>{formatTimestamp(entry.created_at)}</span>
-              </header>
-              <pre class="overflow-x-auto rounded-xl bg-slate-900/60 px-4 py-3 text-sm text-teal-200">
-                <code class="block font-mono text-left">
-                  $ {entry.content}
-                </code>
-              </pre>
-            </article>
-          {/each}
-        </div>
-      {/if}
-    </section>
+      <section class="p-6">
+        {#if activeTab === 'login'}
+          <form class="space-y-4" on:submit|preventDefault={submitLogin}>
+            <div class="space-y-2">
+              <label class="block text-sm font-medium text-slate-200" for="login-username">ชื่อผู้ใช้</label>
+              <input
+                id="login-username"
+                class="w-full rounded-xl border border-slate-800/70 bg-slate-900/80 px-4 py-3 text-sm text-teal-200 focus:border-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                type="text"
+                bind:value={loginForm.username}
+                autocomplete="username"
+                required
+                disabled={isSubmittingLogin}
+              />
+            </div>
+            <div class="space-y-2">
+              <label class="block text-sm font-medium text-slate-200" for="login-password">รหัสผ่าน</label>
+              <input
+                id="login-password"
+                class="w-full rounded-xl border border-slate-800/70 bg-slate-900/80 px-4 py-3 text-sm text-teal-200 focus:border-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                type="password"
+                bind:value={loginForm.password}
+                autocomplete="current-password"
+                required
+                disabled={isSubmittingLogin}
+              />
+            </div>
+            {#if loginError}
+              <p class="text-sm text-rose-400">{loginError}</p>
+            {/if}
+            {#if loginSuccess}
+              <p class="text-sm text-teal-300">{loginSuccess}</p>
+            {/if}
+            <button
+              type="submit"
+              class="w-full rounded-xl bg-teal-500 px-5 py-3 text-sm font-semibold tracking-wide text-slate-950 transition hover:bg-teal-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-300 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isSubmittingLogin}
+            >
+              {isSubmittingLogin ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบ'}
+            </button>
+          </form>
+        {:else}
+          <form class="space-y-4" on:submit|preventDefault={submitRegister}>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div class="space-y-2">
+                <label class="block text-sm font-medium text-slate-200" for="register-username">ชื่อผู้ใช้</label>
+                <input
+                  id="register-username"
+                  class="w-full rounded-xl border border-slate-800/70 bg-slate-900/80 px-4 py-3 text-sm text-teal-200 focus:border-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                  type="text"
+                  bind:value={registerForm.username}
+                  autocomplete="username"
+                  required
+                  disabled={isSubmittingRegister}
+                />
+              </div>
+              <div class="space-y-2">
+                <label class="block text-sm font-medium text-slate-200" for="register-email">อีเมล</label>
+                <input
+                  id="register-email"
+                  class="w-full rounded-xl border border-slate-800/70 bg-slate-900/80 px-4 py-3 text-sm text-teal-200 focus:border-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                  type="email"
+                  bind:value={registerForm.email}
+                  autocomplete="email"
+                  required
+                  disabled={isSubmittingRegister}
+                />
+              </div>
+              <div class="space-y-2">
+                <label class="block text-sm font-medium text-slate-200" for="register-player-name">ชื่อผู้เล่น</label>
+                <input
+                  id="register-player-name"
+                  class="w-full rounded-xl border border-slate-800/70 bg-slate-900/80 px-4 py-3 text-sm text-teal-200 focus:border-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                  type="text"
+                  bind:value={registerForm.playerName}
+                  autocomplete="nickname"
+                  required
+                  disabled={isSubmittingRegister}
+                />
+              </div>
+              <div class="space-y-2">
+                <label class="block text-sm font-medium text-slate-200" for="register-password">รหัสผ่าน</label>
+                <input
+                  id="register-password"
+                  class="w-full rounded-xl border border-slate-800/70 bg-slate-900/80 px-4 py-3 text-sm text-teal-200 focus:border-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                  type="password"
+                  bind:value={registerForm.password}
+                  autocomplete="new-password"
+                  minlength="8"
+                  required
+                  disabled={isSubmittingRegister}
+                />
+              </div>
+              <div class="space-y-2 sm:col-span-2">
+                <label class="block text-sm font-medium text-slate-200" for="register-confirm-password">ยืนยันรหัสผ่าน</label>
+                <input
+                  id="register-confirm-password"
+                  class="w-full rounded-xl border border-slate-800/70 bg-slate-900/80 px-4 py-3 text-sm text-teal-200 focus:border-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                  type="password"
+                  bind:value={registerForm.confirmPassword}
+                  autocomplete="new-password"
+                  minlength="8"
+                  required
+                  disabled={isSubmittingRegister}
+                />
+              </div>
+            </div>
+            <p class="text-xs text-slate-400">หลังจากลงทะเบียน ระบบจะส่งลิงก์ยืนยันไปยังอีเมลของคุณ</p>
+            {#if registerError}
+              <p class="text-sm text-rose-400">{registerError}</p>
+            {/if}
+            {#if registerSuccess}
+              <div class="space-y-2 rounded-xl border border-teal-500/40 bg-teal-500/10 p-4 text-sm text-teal-200">
+                <p>{registerSuccess}</p>
+                {#if verificationLink}
+                  <p class="break-all text-xs text-teal-300/80">
+                    ลิงก์ยืนยันสำหรับการทดสอบ: <a class="underline" href={verificationLink}>{verificationLink}</a>
+                  </p>
+                {/if}
+              </div>
+            {/if}
+            <button
+              type="submit"
+              class="w-full rounded-xl bg-teal-500 px-5 py-3 text-sm font-semibold tracking-wide text-slate-950 transition hover:bg-teal-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-300 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isSubmittingRegister}
+            >
+              {isSubmittingRegister ? 'กำลังสร้างบัญชี...' : 'ลงทะเบียนผู้เล่นใหม่'}
+            </button>
+          </form>
+        {/if}
+      </section>
+    </div>
   </div>
 </div>
+
