@@ -127,6 +127,26 @@ const unwrapExecuteResult = (input: RawExecuteResult): TursoExecuteResult | unde
   return input as TursoExecuteResult;
 };
 
+const interpretHttpError = (status: number, detail: string | null | undefined): string | null => {
+  if (!detail) {
+    return null;
+  }
+
+  const normalizedDetail = detail.trim();
+  if (!normalizedDetail) {
+    return null;
+  }
+
+  if (/S3 session creation failed/i.test(normalizedDetail)) {
+    return (
+      'Turso storage backend is temporarily unavailable (S3 session creation failed). ' +
+      'Please verify your Turso project configuration and try again shortly.'
+    );
+  }
+
+  return null;
+};
+
 const request = async (sql: string, args: unknown[] = []) => {
   const { url, authToken } = getCredentials();
 
@@ -151,6 +171,12 @@ const request = async (sql: string, args: unknown[] = []) => {
 
   if (!response.ok) {
     const detail = await response.text();
+    const interpreted = interpretHttpError(response.status, detail);
+
+    if (interpreted) {
+      throw new TursoRequestError(interpreted);
+    }
+
     throw new TursoRequestError(
       `Turso responded with ${response.status} ${response.statusText}${detail ? `: ${detail}` : ''}`
     );
