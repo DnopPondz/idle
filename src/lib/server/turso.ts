@@ -168,12 +168,20 @@ const mapRows = (result: TursoExecuteResult) => {
   const rows = result.rows ?? [];
 
   return rows.map((row) => {
-    const entry: Record<string, unknown> = {};
-    row.forEach((value, index) => {
-      const key = columns[index] ?? `column_${index}`;
-      entry[key] = value;
-    });
-    return entry;
+    if (Array.isArray(row)) {
+      const entry: Record<string, unknown> = {};
+      row.forEach((value, index) => {
+        const key = columns[index] ?? `column_${index}`;
+        entry[key] = value;
+      });
+      return entry;
+    }
+
+    if (row && typeof row === 'object') {
+      return row as Record<string, unknown>;
+    }
+
+    return { column_0: row };
   });
 };
 
