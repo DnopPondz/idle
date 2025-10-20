@@ -18,16 +18,16 @@ interface TursoExecuteResult {
 
 interface TursoPipelineExecuteResult {
   type: 'execute';
-  result?: TursoExecuteResult;
-  response?: TursoExecuteResult;
+  result?: TursoExecuteResult | Record<string, unknown> | null;
+  response?: TursoExecuteResult | Record<string, unknown> | null;
   error?: { message?: string } | null;
 }
 
 interface TursoPipelineErrorResult {
   type: string;
   error: { message?: string };
-  result?: TursoExecuteResult;
-  response?: TursoExecuteResult;
+  result?: TursoExecuteResult | Record<string, unknown> | null;
+  response?: TursoExecuteResult | Record<string, unknown> | null;
 }
 
 interface TursoPipelineResponse {
@@ -113,6 +113,20 @@ const toValue = (input: unknown): TursoValue => {
   return { type: 'text', value: String(input) };
 };
 
+type RawExecuteResult = TursoExecuteResult | { result?: RawExecuteResult | null } | null | undefined;
+
+const unwrapExecuteResult = (input: RawExecuteResult): TursoExecuteResult | undefined => {
+  if (!input) {
+    return undefined;
+  }
+
+  if (typeof input === 'object' && 'result' in input && input.result) {
+    return unwrapExecuteResult(input.result as RawExecuteResult);
+  }
+
+  return input as TursoExecuteResult;
+};
+
 const request = async (sql: string, args: unknown[] = []) => {
   const { url, authToken } = getCredentials();
 
@@ -153,8 +167,8 @@ const request = async (sql: string, args: unknown[] = []) => {
     throw new TursoRequestError(firstResult.error.message ?? 'Unknown Turso error.');
   }
 
-  const payloadResult = 'result' in firstResult ? firstResult.result : undefined;
-  const payloadResponse = 'response' in firstResult ? firstResult.response : undefined;
+  const payloadResult = unwrapExecuteResult('result' in firstResult ? firstResult.result : undefined);
+  const payloadResponse = unwrapExecuteResult('response' in firstResult ? firstResult.response : undefined);
 
   if (!payloadResult && !payloadResponse) {
     throw new TursoRequestError('Turso response did not include a result payload.');
