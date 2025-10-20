@@ -2,7 +2,7 @@
 
 export default {
   plugins: {
-    '@tailwindcss/postcss': {}, // <-- แก้ไขจาก 'tailwindcss' เป็น '@tailwindcss/postcss'
+    '@tailwindcss/postcss': {},
     autoprefixer: {},
   },
 }
